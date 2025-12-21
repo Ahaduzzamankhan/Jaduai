@@ -1,7 +1,7 @@
-python-telegram-bot
-firebase-admin
-google-generativeai
-openai
-google-api-python-client
-google-auth
-google-auth-oauthlib
+python-telegram-bot>=20.7
+yt-dlp>=2024.8.6
+aiohttp>=3.9.3
+gTTS>=2.5.1
+requests>=2.31.0
+SQLAlchemy>=2.0.0
+Pillow>=10.3.0
