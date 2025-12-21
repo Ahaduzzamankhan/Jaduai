@@ -4,6 +4,7 @@
 ✅ Telegram Star Payments Integrated
 ✅ All Commands Working + New Features
 ✅ Games & Firebase Authentication
+✅ Environment Variables Support
 Developer: @khanahaduzzaman
 """
 
@@ -22,6 +23,10 @@ import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from io import BytesIO
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
 # Telegram imports
 from telegram import (
@@ -52,34 +57,52 @@ import yt_dlp
 from gtts import gTTS
 
 # ==================== CONFIGURATION ====================
-TELEGRAM_TOKEN = "8113764559:AAHZ2jcGua-A3M7zQHi-jvy1Qrm-824vLVg"
-GEMINI_API_KEY = "AIzaSyAJYx4buvFJ6Y_gFE1gLkufXk-g3qvdrQk"
-DEVELOPER_ID = "@khanahaduzzaman"
-ADMIN_IDS = [7474207530, 8113764559]
+# Load from environment variables
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '8113764559:AAHZ2jcGua-A3M7zQHi-jvy1Qrm-824vLVg')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyAJYx4buvFJ6Y_gFE1gLkufXk-g3qvdrQk')
+DEVELOPER_ID = os.getenv('DEVELOPER_ID', '@khanahaduzzaman')
+ADMIN_IDS = [int(id.strip()) for id in os.getenv('ADMIN_IDS', '7474207530,8113764559').split(',')]
 
-# Gemini 2.0 Flash API Endpoint (CORRECTED)
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
+# Gemini 2.0 Flash API Endpoint
+GEMINI_API_URL = os.getenv('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent')
 
 # Weather API
-WEATHER_API_KEY = "7a2e6e2c2d6a4b0b9e0220524242504"
-WEATHER_API_URL = "http://api.weatherapi.com/v1/current.json"
+WEATHER_API_KEY = os.getenv('WEATHER_API_KEY', '7a2e6e2c2d6a4b0b9e0220524242504')
+WEATHER_API_URL = os.getenv('WEATHER_API_URL', 'http://api.weatherapi.com/v1/current.json')
 
 # News API
-NEWS_API_KEY = "9b85f2f4c5e74a73a9c5e314c24c5e4f"
-NEWS_API_URL = "https://newsapi.org/v2/top-headlines"
+NEWS_API_KEY = os.getenv('NEWS_API_KEY', '9b85f2f4c5e74a73a9c5e314c24c5e4f')
+NEWS_API_URL = os.getenv('NEWS_API_URL', 'https://newsapi.org/v2/top-headlines')
 
 # Database
-DB_FILE = "bangla_ai_bot.db"
+DB_FILE = os.getenv('DB_FILE', 'bangla_ai_bot.db')
 
 # Star Prices
-PREMIUM_PRICE = 100
-PROMOTION_PRICE = 25
+PREMIUM_PRICE = int(os.getenv('PREMIUM_PRICE', 100))
+PROMOTION_PRICE = int(os.getenv('PROMOTION_PRICE', 25))
 
 # Rate Limits
 RATE_LIMITS = {
-    "free": {"messages": 100, "calls": 2, "tts": 5, "games": 10, "cooldown": 15},
-    "premium": {"messages": 300, "calls": 5, "tts": 10, "games": 50, "cooldown": 5}
+    "free": {
+        "messages": int(os.getenv('FREE_MESSAGES_LIMIT', 100)),
+        "calls": int(os.getenv('FREE_CALLS_LIMIT', 2)),
+        "tts": int(os.getenv('FREE_TTS_LIMIT', 5)),
+        "games": int(os.getenv('FREE_GAMES_LIMIT', 10)),
+        "cooldown": int(os.getenv('FREE_COOLDOWN', 15))
+    },
+    "premium": {
+        "messages": int(os.getenv('PREMIUM_MESSAGES_LIMIT', 300)),
+        "calls": int(os.getenv('PREMIUM_CALLS_LIMIT', 5)),
+        "tts": int(os.getenv('PREMIUM_TTS_LIMIT', 10)),
+        "games": int(os.getenv('PREMIUM_GAMES_LIMIT', 50)),
+        "cooldown": int(os.getenv('PREMIUM_COOLDOWN', 5))
+    }
 }
+
+# Bot Settings
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+PORT = int(os.getenv('PORT', 8080))
+WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
 
 # Languages
 LANGUAGES = {
@@ -127,7 +150,7 @@ GAMES = {
 # ==================== LOGGING SETUP ====================
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL),
     handlers=[
         logging.FileHandler('bot.log'),
         logging.StreamHandler()
@@ -326,7 +349,7 @@ def update_payment_status(payment_id: str, status: str):
         logger.error(f"Error updating payment status: {e}")
         return False
 
-# ==================== GEMINI 2.0 FLASH API (FIXED) ====================
+# ==================== GEMINI 2.0 FLASH API ====================
 async def get_gemini_response(prompt: str, user_id: int, language: str = 'bn') -> str:
     """Get response from Gemini 2.0 Flash via HTTP API"""
     try:
@@ -1059,7 +1082,7 @@ async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def lang_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /lang command - FIXED"""
+    """Handle /lang command"""
     user = update.effective_user
     
     if not context.args:
@@ -1407,6 +1430,126 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """
     await update.message.reply_text(stats_text, parse_mode='Markdown')
 
+# ==================== ADMIN COMMANDS ====================
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin commands"""
+    user_id = update.effective_user.id
+    
+    if user_id not in ADMIN_IDS:
+        await update.message.reply_text("❌ You are not authorized to use admin commands.")
+        return
+    
+    if not context.args:
+        admin_text = f"""
+🔐 **Admin Commands**
+
+👥 *User Management:*
+/admin users - List all users
+/admin stats - Bot statistics
+/admin broadcast [message] - Broadcast to all users
+/admin notify [user_id] [message] - Send message to specific user
+
+💰 *Payment Management:*
+/admin payments - List recent payments
+/admin premium [user_id] - Grant premium to user
+/admin stars [user_id] [amount] - Add stars to user
+
+⚙️ *Bot Management:*
+/admin restart - Restart bot
+/admin logs - View logs
+/admin db - Database info
+
+*Example:* /admin broadcast Hello everyone!
+"""
+        await update.message.reply_text(admin_text, parse_mode='Markdown')
+        return
+    
+    command = context.args[0].lower()
+    
+    if command == "users":
+        # List all users
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM users")
+            count = cursor.fetchone()[0]
+            conn.close()
+            
+            await update.message.reply_text(f"👥 Total Users: {count}")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+    
+    elif command == "stats":
+        # Bot statistics
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_premium = 1")
+            premium_users = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM payments WHERE status = 'completed'")
+            total_payments = cursor.fetchone()[0]
+            
+            conn.close()
+            
+            stats_text = f"""
+📊 **Bot Statistics**
+
+👥 Total Users: {total_users}
+⭐ Premium Users: {premium_users}
+💰 Total Payments: {total_payments}
+📅 Uptime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+            await update.message.reply_text(stats_text, parse_mode='Markdown')
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+    
+    elif command == "broadcast":
+        # Broadcast message
+        if len(context.args) < 2:
+            await update.message.reply_text("❌ Usage: /admin broadcast [message]")
+            return
+        
+        message = " ".join(context.args[1:])
+        
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM users")
+            users = cursor.fetchall()
+            conn.close()
+            
+            total = len(users)
+            success = 0
+            failed = 0
+            
+            await update.message.reply_text(f"📢 Broadcasting to {total} users...")
+            
+            for (user_id,) in users:
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=f"📢 **Broadcast Message**\n\n{message}",
+                        parse_mode='Markdown'
+                    )
+                    success += 1
+                    await asyncio.sleep(0.1)  # Rate limiting
+                except:
+                    failed += 1
+            
+            await update.message.reply_text(
+                f"✅ Broadcast Complete!\n\n"
+                f"✅ Success: {success}\n"
+                f"❌ Failed: {failed}\n"
+                f"📊 Total: {total}"
+            )
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+
 # ==================== SETUP BOT COMMANDS MENU ====================
 async def setup_bot_commands(application):
     """Set up bot commands menu in Telegram"""
@@ -1434,7 +1577,8 @@ async def setup_bot_commands(application):
         BotCommand("news", "Latest news"),
         BotCommand("bdnews", "Bangladesh news"),
         BotCommand("weather", "Weather information"),
-        BotCommand("bdtime", "Bangladesh time")
+        BotCommand("bdtime", "Bangladesh time"),
+        BotCommand("admin", "Admin commands")
     ]
     
     await application.bot.set_my_commands(commands)
@@ -1454,7 +1598,17 @@ def main():
     print(f"📢 Promotion Price: {PROMOTION_PRICE} Stars")
     print(f"🎮 Games: {len(GAMES)} available")
     print(f"💾 Database: {DB_FILE}")
+    print(f"⚙️ Environment: {len([k for k in os.environ if k.startswith(('TELEGRAM', 'GEMINI', 'WEATHER', 'NEWS'))])} variables loaded")
     print("=" * 70)
+    
+    # Check required environment variables
+    required_vars = ['TELEGRAM_TOKEN', 'GEMINI_API_KEY']
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"❌ Missing environment variables: {', '.join(missing_vars)}")
+        print("ℹ️ Please check your .env file")
+        return
     
     try:
         # Create application
@@ -1487,6 +1641,7 @@ def main():
         application.add_handler(CommandHandler("bdnews", bdnews_command))
         application.add_handler(CommandHandler("weather", weather_command))
         application.add_handler(CommandHandler("bdtime", bdtime_command))
+        application.add_handler(CommandHandler("admin", admin_command))
         
         # Add callback handlers for language selection
         application.add_handler(CallbackQueryHandler(lang_callback_handler, pattern="^lang_"))
@@ -1514,12 +1669,13 @@ def main():
         print(f"❌ Error: {e}")
 
 if __name__ == '__main__':
-    # Install required packages if needed
+    # Check and install required packages
     required_packages = [
         "python-telegram-bot",
         "yt-dlp",
         "aiohttp",
-        "gTTS"
+        "gTTS",
+        "python-dotenv"
     ]
     
     for package in required_packages:
